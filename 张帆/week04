@@ -1,0 +1,105 @@
+import random
+import numpy as np
+
+
+def gaussian_noise(src, means, sigma, per):  # src 来源图片  means
+    noise_img = src
+    noise_num = int(per * src.shape[0] * src.shape[1])
+    for i in range(noise_num):
+        rand_x = random.randint(0, src.shape[0]-1)
+        rand_y = random.randint(0, src.shape[1] - 1)
+        noise_img[rand_x][rand_y] = noise_img[rand_x][rand_y] + random.gauss(means, sigma)
+        if noise_img[rand_x][rand_y] < 0:
+            noise_img[rand_x][rand_y] = 0
+        if noise_img[rand_x][rand_y] > 255:
+            noise_img[rand_x][rand_y] = 255
+    return noise_img
+
+
+def salt_pepper_noise(src, per):  # src 来源图片  per 噪音百分比
+    noise_img = src
+    noise_num = int(per * src.shape[0] * src.shape[1])
+    for i in range(noise_num):
+        rand_x = random.randint(0, src.shape[0] - 1)
+        rand_y = random.randint(0, src.shape[1] - 1)
+        is255 = random.random()
+        if is255 < 0.5:
+            noise_img[rand_x][rand_y] = 0
+        else:
+            noise_img[rand_x][rand_y] = 255
+    return noise_img
+
+
+class CPca (object):
+
+    def __init__(self, X, K):
+        self.X = X  # 样本矩阵X
+        self.K = K  # K阶降维矩阵的K值
+        self.centX = []  # 矩阵X的中心化
+        self.C = []  # 样本集的协方差矩阵C
+        self.U = []  # 样本矩阵X的降维转换矩阵
+        self.Z = []  # 样本矩阵X的降维矩阵Z
+
+        self.centX = self._centralized()
+        self.C = self._matrix_cov()
+        self.U = self._matrix_u()
+        self.Z = self._matrix_z()  # Z=XU求得
+
+    def _centralized(self):
+        # '''矩阵X的中心化'''
+        print('样本矩阵X:\n', self.X)
+        cent_x = []
+        mean = np.array([np.mean(attr) for attr in self.X.T])  # 样本集的特征均值
+        print('样本集的特征均值:\n', mean)
+        cent_x = self.X - mean  # 样本集的中心化
+        print('样本矩阵X的中心化cent_X:\n', cent_x)
+        return cent_x
+
+    def _matrix_cov(self):
+        # '''求样本矩阵X的协方差矩阵C'''
+        # 样本集的样例总数
+        ns = np.shape(self.centX)[0]
+        # 样本矩阵的协方差矩阵rc
+        matrix_c = np.dot(self.centX.T, self.centX)/(ns - 1)
+        print('样本矩阵X的协方差矩阵C:\n', matrix_c)
+        return matrix_c
+
+    def _matrix_u(self):
+        # '''求X的降维转换矩阵U, shape=(n,k), n是X的特征维度总数，k是降维矩阵的特征维度'''
+        # 先求X的协方差矩阵C的特征值和特征向量
+        a,b = np.linalg.eig(self.C) # 特征值赋值给a，对应特征向量赋值给b。函数doc：https://docs.scipy.org/doc/numpy-1.10.0/reference/generated/numpy.linalg.eig.html
+        print('样本集的协方差矩阵C的特征值:\n', a)
+        print('样本集的协方差矩阵C的特征向量:\n', b)
+        # 给出特征值降序的topK的索引序列
+        ind = np.argsort(-1*a)
+        # 构建K阶降维的降维转换矩阵U
+        ut = [b[:, ind[i]] for i in range(self.K)]
+        matrix_u = np.transpose(ut)
+        print('%d阶降维转换矩阵U:\n' % self.K, matrix_u)
+        return matrix_u
+
+    def _matrix_z(self):
+        # '''按照Z=XU求降维矩阵Z, shape=(m,k), n是样本总数，k是降维矩阵中特征维度总数'''
+        matrix_z = np.dot(self.X, self.U)
+        print('X shape:', np.shape(self.X))
+        print('U shape:', np.shape(self.U))
+        print('Z shape:', np.shape(matrix_z))
+        print('样本矩阵X的降维矩阵Z:\n', matrix_z)
+        return matrix_z
+
+
+if __name__ == '__main__':
+    # '10样本3特征的样本集, 行为样例，列为特征维度'
+    X = np.array([[10, 15, 29],
+                  [15, 46, 13],
+                  [23, 21, 30],
+                  [11, 9,  35],
+                  [42, 45, 11],
+                  [9,  48, 5],
+                  [11, 21, 14],
+                  [8,  5,  15],
+                  [11, 12, 21],
+                  [21, 20, 25]])
+    K = np.shape(X)[1] - 1
+    print('样本集(10行3列，10个样例，每个样例3个特征):\n', X)
+    pca = CPca(X, K)
